@@ -1,0 +1,16 @@
+# Netlify deployment config for the HTC Poonagala 2026 app (Vite + React SPA).
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Single-page-app fallback: every route serves index.html so client-side
+# routes (e.g. /admin/score/:id, /admin/print/team/:id) work on direct load /
+# refresh instead of 404-ing.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
