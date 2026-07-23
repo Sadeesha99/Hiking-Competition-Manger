@@ -1,0 +1,15 @@
+node_modules
+dist
+dist-ssr
+*.local
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+
+# editor / os
+.DS_Store
+.idea
+.vscode
+*.log
+npm-debug.log*

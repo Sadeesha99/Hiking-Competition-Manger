@@ -1,0 +1,141 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 antialiased;
+}
+
+/* Bigger, comfortable tap targets on mobile score inputs */
+input[inputmode='numeric'],
+input[type='time'] {
+  @apply tabular-nums;
+}
+
+/* ---------------------------------------------------------------------------
+   Global watermark — the Trekker logo, faint and centred, behind every screen.
+   Fixed to the viewport, non-interactive, and sits on a negative z-index so it
+   never overlaps content or affects clicks. The source logo is white (for dark
+   backgrounds); inverting it makes a subtle grey emblem on our light UI.
+   Hidden when printing (print sheets stay clean black-on-white).
+   --------------------------------------------------------------------------- */
+.app-watermark {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: url('../images/trekker-logo-white-rectangle.png');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: min(78vw, 720px);
+  opacity: 0.05;
+  filter: invert(1);
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold
+           transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1
+           disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-brand-700 text-white hover:bg-brand-800 focus-visible:ring-brand-600;
+  }
+  .btn-secondary {
+    @apply btn border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 focus-visible:ring-slate-400;
+  }
+  .btn-danger {
+    @apply btn bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-500;
+  }
+  .btn-ghost {
+    @apply btn text-slate-600 hover:bg-slate-100;
+  }
+  .input {
+    @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm
+           placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500;
+  }
+  .label {
+    @apply mb-1 block text-sm font-medium text-slate-700;
+  }
+  .card {
+    @apply rounded-xl border border-slate-200 bg-white shadow-sm;
+  }
+  .badge {
+    @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Print stylesheet — used by all three printable views (@media print).
+   Hide chrome/nav/buttons, force black on white, page breaks between sheets.
+   --------------------------------------------------------------------------- */
+@media print {
+  body {
+    background: #fff !important;
+    color: #000 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .app-watermark {
+    display: none !important;
+  }
+  .no-print,
+  nav,
+  .btn,
+  .btn-primary,
+  .btn-secondary,
+  .btn-danger,
+  .btn-ghost {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+  .page-break {
+    break-before: page;
+    page-break-before: always;
+  }
+  .print-sheet {
+    page-break-inside: avoid;
+  }
+  .print-container {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: none !important;
+  }
+  table.print-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+  }
+  table.print-table th,
+  table.print-table td {
+    border: 1px solid #000;
+    padding: 4px 6px;
+    color: #000;
+  }
+  table.print-table thead {
+    display: table-header-group;
+  }
+  a {
+    text-decoration: none;
+    color: #000;
+  }
+  @page {
+    margin: 14mm;
+  }
+}
+
+.print-only {
+  display: none;
+}
