@@ -188,6 +188,18 @@ export function individualEvents(events: GameEvent[]): GameEvent[] {
 }
 
 /**
+ * Events whose scores are "released" to the public: the event is finalized
+ * (status === 'final', i.e. no longer a draft) AND at least one score has been
+ * posted. Used by the public Events tab and progression chart so the public
+ * only ever sees events whose results are actually out. Returned in event order.
+ */
+export function releasedEvents(data: DataSnapshot): GameEvent[] {
+  return eventsInOrder(data.events).filter(
+    (ev) => ev.status === 'final' && data.scores.some((s) => s.event_id === ev.id && s.value != null),
+  )
+}
+
+/**
  * A player's total individual contribution — measured the way the main board
  * counts it. For each INDIVIDUAL event we take the player's raw marks and apply
  * the SAME scale factor the main board uses for that event
@@ -255,10 +267,15 @@ export function eventsInOrder(events: GameEvent[]): GameEvent[] {
  * Progression data: cumulative main-board total per team across events in order.
  * Returns rows [{ eventName, [teamName]: cumulativeTotal }] for Recharts.
  */
-export function computeProgression(data: DataSnapshot): Array<Record<string, number | string>> {
+export function computeProgression(
+  data: DataSnapshot,
+  eventsList?: GameEvent[],
+): Array<Record<string, number | string>> {
   const { teams, criteria, scores, settings } = data
   const dp = settings.rounding_dp
-  const events = eventsInOrder(data.events)
+  const events = eventsList
+    ? [...eventsList].sort((a, b) => a.order_index - b.order_index)
+    : eventsInOrder(data.events)
 
   const cumulative = new Map<ID, number>(teams.map((t) => [t.id, 0]))
   const rows: Array<Record<string, number | string>> = [

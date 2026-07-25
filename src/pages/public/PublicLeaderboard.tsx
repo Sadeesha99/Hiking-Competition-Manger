@@ -5,6 +5,7 @@ import {
   computeProgression,
   computeStandings,
   eventsInOrder,
+  releasedEvents,
 } from '../../lib/scoring'
 import { fmt } from '../../lib/format'
 import { cx, EmptyState, FullPageLoader, Spinner } from '../../components/ui'
@@ -21,11 +22,15 @@ export default function PublicLeaderboard() {
 
   const standings = useMemo(() => (state ? computeStandings(state) : []), [state])
   const contributions = useMemo(() => (state ? computeContributions(state) : []), [state])
-  const progression = useMemo(() => (state ? computeProgression(state) : []), [state])
+  // All events (used for the per-team breakdown) and the subset already released.
   const events = useMemo(() => (state ? eventsInOrder(state.events) : []), [state])
+  const released = useMemo(() => (state ? releasedEvents(state) : []), [state])
+  // Progression follows released events only, so the x-axis is one point per
+  // released result rather than every configured (incl. draft/unscored) event.
+  const progression = useMemo(() => (state ? computeProgression(state, released) : []), [state, released])
 
-  // The event shown on the Events tab — the chosen one, or the first available.
-  const selectedEventId = eventId || events[0]?.id || ''
+  // The event shown on the Events tab — the chosen one (if still released) or the first released one.
+  const selectedEventId = released.some((e) => e.id === eventId) ? eventId : released[0]?.id ?? ''
 
   // Teams ranked by their scaled score in the selected event (entered first).
   const eventRows = useMemo(() => {
@@ -45,7 +50,6 @@ export default function PublicLeaderboard() {
   if (loading || !state) return <FullPageLoader label="Loading leaderboard…" />
 
   const hasTeams = standings.length > 0
-  const anyScored = standings.some((s) => s.total !== 0)
 
   return (
     <div className="space-y-4">
@@ -177,19 +181,24 @@ export default function PublicLeaderboard() {
         ))}
 
       {tab === 'events' &&
-        (events.length === 0 ? (
-          <EmptyState title="No events yet" hint="Each game event's team scores will appear here once organisers add them." />
+        (released.length === 0 ? (
+          <EmptyState title="No results released yet" hint="An event's team scores appear here once the organisers finalise and release it." />
         ) : (
           <div className="space-y-3">
             <div className="card p-3">
-              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">Game event</label>
+              <div className="mb-2 flex items-center justify-between">
+                <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">Game event</label>
+                <span className="badge bg-brand-100 text-brand-800">
+                  {released.length} {released.length === 1 ? 'event' : 'events'} released
+                </span>
+              </div>
               <div className="relative">
                 <select
                   value={selectedEventId}
                   onChange={(e) => setEventId(e.target.value)}
                   className="w-full appearance-none rounded-lg border border-slate-300 bg-white px-3 py-2 pr-9 text-sm font-medium text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                 >
-                  {events.map((ev) => (
+                  {released.map((ev) => (
                     <option key={ev.id} value={ev.id}>
                       {ev.name}
                     </option>
@@ -238,11 +247,11 @@ export default function PublicLeaderboard() {
         ))}
 
       {tab === 'progress' &&
-        (!anyScored ? (
-          <EmptyState title="No scores yet" hint="The progression chart fills in as events are scored." />
+        (released.length === 0 ? (
+          <EmptyState title="No results released yet" hint="The progression chart fills in as each event's scores are released." />
         ) : (
           <div className="card p-3 sm:p-4">
-            <h2 className="mb-2 text-sm font-semibold text-slate-700">Cumulative score by event</h2>
+            <h2 className="mb-2 text-sm font-semibold text-slate-700">Cumulative score by released event</h2>
             <ProgressionChart data={progression} teams={state.teams} height={340} />
           </div>
         ))}
