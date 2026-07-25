@@ -6,7 +6,11 @@
 //   team_raw(team,event)     = Σ number-criteria − Σ penalty-criteria
 //   team_scaled(team,event)  = team_raw × (COALESCE(scale_to, event_max) / event_max)
 //   team_main_total(team)    = Σ team_scaled over events + Σ adjustments.delta
-//   player_individual_total  = Σ scores across the INDIVIDUAL events
+//   player_individual_total  = Σ, over INDIVIDUAL events, of the player's raw
+//                              marks × that event's main-board scale factor.
+//                              (i.e. the player's *scaled* contribution — what
+//                              actually counts on the main board — so a team's
+//                              players sum to the team's scaled event score.)
 // ---------------------------------------------------------------------------
 
 import type {
@@ -183,16 +187,39 @@ export function individualEvents(events: GameEvent[]): GameEvent[] {
   return events.filter((e) => e.scoring_method === 'INDIVIDUAL')
 }
 
+/**
+ * A player's total individual contribution — measured the way the main board
+ * counts it. For each INDIVIDUAL event we take the player's raw marks and apply
+ * the SAME scale factor the main board uses for that event
+ * (COALESCE(scale_to, event_max) / event_max). Summing all of a team's players
+ * for an event therefore reproduces that team's scaled event score exactly,
+ * so the individual leaderboard reconciles with the main scoreboard.
+ *
+ * When an event isn't scaled (scale_to unset or equal to event_max), the factor
+ * is 1 and this reduces to the plain sum of raw marks.
+ */
 export function playerIndividualTotal(playerId: ID, events: GameEvent[], criteria: Criterion[], scores: Score[]): number {
-  const indEventIds = new Set(individualEvents(events).map((e) => e.id))
+  const critById = new Map(criteria.map((c) => [c.id, c]))
   let total = 0
-  for (const s of scores) {
-    if (s.player_id !== playerId) continue
-    if (!indEventIds.has(s.event_id)) continue
-    if (s.value == null) continue
-    const crit = criteria.find((c) => c.id === s.criterion_id)
-    if (!crit || crit.type === 'time') continue
-    total += crit.type === 'penalty' ? -Math.abs(s.value) : s.value
+  for (const ev of individualEvents(events)) {
+    // raw marks this player contributed in this event (penalties subtract, time ignored)
+    let raw = 0
+    let contributed = false
+    for (const s of scores) {
+      if (s.player_id !== playerId) continue
+      if (s.event_id !== ev.id) continue
+      if (s.value == null) continue
+      const crit = critById.get(s.criterion_id)
+      if (!crit || crit.type === 'time') continue
+      contributed = true
+      raw += crit.type === 'penalty' ? -Math.abs(s.value) : s.value
+    }
+    if (!contributed) continue
+
+    // Apply the main board's per-event scale factor (see computeTeamEventScore).
+    const max = eventMax(ev, criteria)
+    const target = ev.scale_to ?? max // COALESCE(scale_to, event_max)
+    total += max != null && max > 0 && target != null ? raw * (target / max) : raw
   }
   return total
 }

@@ -9,19 +9,38 @@ import {
 import { fmt } from '../../lib/format'
 import { cx, EmptyState, FullPageLoader, Spinner } from '../../components/ui'
 import { ProgressionChart } from '../../components/charts'
-import { ChartBar, ChevronDown, Trophy, Users } from '../../components/icons'
+import { ChartBar, ChevronDown, Flag, Trophy, Users } from '../../components/icons'
 
-type Tab = 'teams' | 'players' | 'progress'
+type Tab = 'teams' | 'players' | 'events' | 'progress'
 
 export default function PublicLeaderboard() {
   const { state, loading } = useData()
   const [tab, setTab] = useState<Tab>('teams')
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [eventId, setEventId] = useState<string>('')
 
   const standings = useMemo(() => (state ? computeStandings(state) : []), [state])
   const contributions = useMemo(() => (state ? computeContributions(state) : []), [state])
   const progression = useMemo(() => (state ? computeProgression(state) : []), [state])
   const events = useMemo(() => (state ? eventsInOrder(state.events) : []), [state])
+
+  // The event shown on the Events tab — the chosen one, or the first available.
+  const selectedEventId = eventId || events[0]?.id || ''
+
+  // Teams ranked by their scaled score in the selected event (entered first).
+  const eventRows = useMemo(() => {
+    if (!selectedEventId) return [] as Array<{ standing: (typeof standings)[number]; scaled: number; entered: boolean }>
+    return standings
+      .map((s) => {
+        const es = s.eventScores[selectedEventId]
+        return { standing: s, scaled: es?.scaled ?? 0, entered: !!es?.entered }
+      })
+      .sort((a, b) => {
+        if (a.entered !== b.entered) return a.entered ? -1 : 1
+        if (b.scaled !== a.scaled) return b.scaled - a.scaled
+        return a.standing.team.entry_no.localeCompare(b.standing.team.entry_no)
+      })
+  }, [standings, selectedEventId])
 
   if (loading || !state) return <FullPageLoader label="Loading leaderboard…" />
 
@@ -31,12 +50,15 @@ export default function PublicLeaderboard() {
   return (
     <div className="space-y-4">
       {/* segmented control */}
-      <div className="grid grid-cols-3 gap-1 rounded-xl bg-slate-200/70 p-1 text-sm font-semibold">
+      <div className="grid grid-cols-4 gap-1 rounded-xl bg-slate-200/70 p-1 text-sm font-semibold">
         <TabButton active={tab === 'teams'} onClick={() => setTab('teams')} icon={<Trophy className="h-4 w-4" />}>
           Teams
         </TabButton>
         <TabButton active={tab === 'players'} onClick={() => setTab('players')} icon={<Users className="h-4 w-4" />}>
           Players
+        </TabButton>
+        <TabButton active={tab === 'events'} onClick={() => setTab('events')} icon={<Flag className="h-4 w-4" />}>
+          Events
         </TabButton>
         <TabButton active={tab === 'progress'} onClick={() => setTab('progress')} icon={<ChartBar className="h-4 w-4" />}>
           Progress
@@ -151,6 +173,67 @@ export default function PublicLeaderboard() {
                 ))}
               </tbody>
             </table>
+          </div>
+        ))}
+
+      {tab === 'events' &&
+        (events.length === 0 ? (
+          <EmptyState title="No events yet" hint="Each game event's team scores will appear here once organisers add them." />
+        ) : (
+          <div className="space-y-3">
+            <div className="card p-3">
+              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">Game event</label>
+              <div className="relative">
+                <select
+                  value={selectedEventId}
+                  onChange={(e) => setEventId(e.target.value)}
+                  className="w-full appearance-none rounded-lg border border-slate-300 bg-white px-3 py-2 pr-9 text-sm font-medium text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                >
+                  {events.map((ev) => (
+                    <option key={ev.id} value={ev.id}>
+                      {ev.name}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              </div>
+            </div>
+
+            <div className="card overflow-hidden">
+              <div className="border-b border-slate-100 px-3 py-2 text-xs text-slate-500">
+                Score each team counts on the main board for this event.
+              </div>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+                    <th className="w-12 px-3 py-2.5 text-center">#</th>
+                    <th className="px-2 py-2.5">Team</th>
+                    <th className="px-3 py-2.5 text-right">Score</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {eventRows.map((row, i) => (
+                    <tr key={row.standing.team.id} className="border-b border-slate-100">
+                      <td className="px-3 py-2.5 text-center">
+                        {row.entered ? <RankPill rank={i + 1} /> : <span className="text-slate-300">—</span>}
+                      </td>
+                      <td className="px-2 py-2.5">
+                        <div className="font-medium text-slate-900">{row.standing.team.name}</div>
+                        <div className="text-xs text-slate-400">Entry {row.standing.team.entry_no}</div>
+                      </td>
+                      <td
+                        className={cx(
+                          'px-3 py-2.5 text-right font-bold tabular-nums',
+                          row.entered ? 'text-slate-900' : 'text-slate-300',
+                        )}
+                      >
+                        {row.entered ? fmt(row.scaled) : 'Not scored'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         ))}
 
