@@ -144,3 +144,12 @@ export interface PlayerContribution {
   team: Team
   points: number
 }
+
+/** A single player's contribution within one event (for the Reports section). */
+export interface PlayerEventContribution {
+  player: Player
+  team: Team
+  raw: number // marks the player entered in the event
+  scaled: number // what those marks count as on the main board
+  scaleApplied: boolean // the event's scaling changed raw → scaled
+}

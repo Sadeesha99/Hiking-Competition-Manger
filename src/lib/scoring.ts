@@ -21,6 +21,7 @@ import type {
   ID,
   Player,
   PlayerContribution,
+  PlayerEventContribution,
   Score,
   Team,
   TeamEventScore,
@@ -210,30 +211,86 @@ export function releasedEvents(data: DataSnapshot): GameEvent[] {
  * When an event isn't scaled (scale_to unset or equal to event_max), the factor
  * is 1 and this reduces to the plain sum of raw marks.
  */
+/**
+ * One player's contribution in ONE event: their raw marks and the value those
+ * marks count as on the main board (raw × the event's scale factor). `entered`
+ * is true when the player has at least one non-time mark in the event.
+ * Penalties subtract; `time` criteria never contribute.
+ */
+export function playerEventScaled(
+  playerId: ID,
+  event: GameEvent,
+  criteria: Criterion[],
+  scores: Score[],
+): { raw: number; scaled: number; entered: boolean; scaleApplied: boolean } {
+  const ecs = new Map(criteriaFor(criteria, event.id).map((c) => [c.id, c]))
+  let raw = 0
+  let entered = false
+  for (const s of scores) {
+    if (s.player_id !== playerId) continue
+    if (s.event_id !== event.id) continue
+    if (s.value == null) continue
+    const crit = ecs.get(s.criterion_id)
+    if (!crit || crit.type === 'time') continue
+    entered = true
+    raw += crit.type === 'penalty' ? -Math.abs(s.value) : s.value
+  }
+  // Apply the main board's per-event scale factor (see computeTeamEventScore).
+  const max = eventMax(event, criteria)
+  const target = event.scale_to ?? max // COALESCE(scale_to, event_max)
+  let scaled = raw
+  let scaleApplied = false
+  if (max != null && max > 0 && target != null) {
+    scaled = raw * (target / max)
+    scaleApplied = target !== max
+  }
+  return { raw, scaled, entered, scaleApplied }
+}
+
 export function playerIndividualTotal(playerId: ID, events: GameEvent[], criteria: Criterion[], scores: Score[]): number {
-  const critById = new Map(criteria.map((c) => [c.id, c]))
   let total = 0
   for (const ev of individualEvents(events)) {
-    // raw marks this player contributed in this event (penalties subtract, time ignored)
-    let raw = 0
-    let contributed = false
-    for (const s of scores) {
-      if (s.player_id !== playerId) continue
-      if (s.event_id !== ev.id) continue
-      if (s.value == null) continue
-      const crit = critById.get(s.criterion_id)
-      if (!crit || crit.type === 'time') continue
-      contributed = true
-      raw += crit.type === 'penalty' ? -Math.abs(s.value) : s.value
-    }
-    if (!contributed) continue
-
-    // Apply the main board's per-event scale factor (see computeTeamEventScore).
-    const max = eventMax(ev, criteria)
-    const target = ev.scale_to ?? max // COALESCE(scale_to, event_max)
-    total += max != null && max > 0 && target != null ? raw * (target / max) : raw
+    const { scaled, entered } = playerEventScaled(playerId, ev, criteria, scores)
+    if (entered) total += scaled
   }
   return total
+}
+
+/**
+ * Individually-scored events that are finalised (locked). These are the events
+ * eligible for the per-event "best player" report.
+ */
+export function finalizedIndividualEvents(data: DataSnapshot): GameEvent[] {
+  return individualEvents(eventsInOrder(data.events)).filter((e) => e.status === 'final')
+}
+
+/**
+ * Every player who scored in `eventId`, ranked by their contribution to the
+ * main board (scaled), highest first. Ties break on the player's name.
+ */
+export function bestPlayersForEvent(data: DataSnapshot, eventId: ID): PlayerEventContribution[] {
+  const ev = data.events.find((e) => e.id === eventId)
+  if (!ev) return []
+  const dp = data.settings.rounding_dp
+  const teamById = new Map(data.teams.map((t) => [t.id, t]))
+  const rows: PlayerEventContribution[] = []
+  for (const player of data.players) {
+    const team = teamById.get(player.team_id)
+    if (!team) continue
+    const { raw, scaled, entered, scaleApplied } = playerEventScaled(player.id, ev, data.criteria, data.scores)
+    if (!entered) continue
+    rows.push({ player, team, raw: round(raw, dp), scaled: round(scaled, dp), scaleApplied })
+  }
+  rows.sort((a, b) => b.scaled - a.scaled || a.player.name.localeCompare(b.player.name))
+  return rows
+}
+
+/**
+ * Team captains (leaders) ranked by the points they personally contributed to
+ * the main board across all individually-scored events.
+ */
+export function captainContributions(data: DataSnapshot): PlayerContribution[] {
+  return computeContributions(data).filter((c) => c.player.is_leader)
 }
 
 export function computeContributions(data: DataSnapshot): PlayerContribution[] {

@@ -9,6 +9,7 @@ import {
   ChartBar,
   Clipboard,
   Cog,
+  FileText,
   Flag,
   LogOut,
   Menu,
@@ -24,6 +25,7 @@ const NAV = [
   { to: '/admin/events', label: 'Events & Criteria', icon: Flag, end: false },
   { to: '/admin/score', label: 'Score Entry', icon: Clipboard, end: false },
   { to: '/admin/adjustments', label: 'Adjustments', icon: Trophy, end: false },
+  { to: '/admin/reports', label: 'Reports', icon: FileText, end: false },
   { to: '/admin/audit', label: 'Audit Log', icon: Refresh, end: false },
   { to: '/admin/settings', label: 'Settings', icon: Cog, end: false },
 ]

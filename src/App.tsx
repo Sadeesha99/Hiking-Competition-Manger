@@ -14,6 +14,7 @@ import Teams from './pages/admin/Teams'
 import Events from './pages/admin/Events'
 import ScoreEntry from './pages/admin/ScoreEntry'
 import Adjustments from './pages/admin/Adjustments'
+import Reports from './pages/admin/Reports'
 import AuditLog from './pages/admin/AuditLog'
 import Settings from './pages/admin/Settings'
 
@@ -59,6 +60,7 @@ export default function App() {
               <Route path="score" element={<ScoreEntry />} />
               <Route path="score/:eventId" element={<ScoreEntry />} />
               <Route path="adjustments" element={<Adjustments />} />
+              <Route path="reports" element={<Reports />} />
               <Route path="audit" element={<AuditLog />} />
               <Route path="settings" element={<Settings />} />
             </Route>
